@@ -227,16 +227,28 @@ function traverseAllChildren(
   visitor: SvelteVisitor,
 ) {
   if (path.node.children) {
-    traverseChildren(path.node.children, path, visitor);
+    path.node.children = traverseChildren(path.node.children, path, visitor);
   }
   if (path.node.attributes) {
-    traverseChildren(path.node.attributes, path, visitor);
+    path.node.attributes = traverseChildren(
+      path.node.attributes,
+      path,
+      visitor,
+    );
   }
   if (path.node.expression) {
     visitRecast(path.node.expression, visitor);
   }
   if (path.node.identifiers) {
-    visitRecast(path.node.identifiers, visitor);
+    path.node.identifiers = traverseChildren(
+      path.node.identifiers,
+      path,
+      visitor,
+    );
+  }
+
+  if (path.node.value && Array.isArray(path.node.value)) {
+    path.node.value = traverseChildren(path.node.value, path, visitor);
   }
 }
 

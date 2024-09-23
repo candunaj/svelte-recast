@@ -11,6 +11,8 @@ import type {
   SpreadAttribute,
   Directive,
   Transition,
+  BaseNode,
+  BaseExpressionDirective,
   Comment,
 } from 'svelte/types/compiler/interfaces';
 import { simple, ancestor } from 'acorn-walk';
@@ -33,6 +35,14 @@ type SvelteVisitorContext = {
 };
 
 export interface SvelteVisitorMethods {
+  visitSvelteSpread(
+    this: SvelteVisitorContext,
+    path: SveltePath<BaseNode>,
+  ): false | void;
+  visitSvelteTransition(
+    this: SvelteVisitorContext,
+    path: SveltePath<BaseExpressionDirective>,
+  ): false | void;
   visitSvelteText(
     this: SvelteVisitorContext,
     path: SveltePath<SvelteText>,
@@ -57,6 +67,42 @@ export interface SvelteVisitorMethods {
     this: SvelteVisitorContext,
     path: SveltePath<Element>,
   ): false | void;
+  visitSvelteInlineComponent(
+    this: SvelteVisitorContext,
+    path: SveltePath<Element>,
+  ): false | void;
+  visitSvelteSlotTemplate(
+    this: SvelteVisitorContext,
+    path: SveltePath<Element>,
+  ): false | void;
+  visitSvelteTitle(
+    this: SvelteVisitorContext,
+    path: SveltePath<Element>,
+  ): false | void;
+  visitSvelteSlot(
+    this: SvelteVisitorContext,
+    path: SveltePath<Element>,
+  ): false | void;
+  visitSvelteHead(
+    this: SvelteVisitorContext,
+    path: SveltePath<Element>,
+  ): false | void;
+  visitSvelteOptions(
+    this: SvelteVisitorContext,
+    path: SveltePath<Element>,
+  ): false | void;
+  visitSvelteWindow(
+    this: SvelteVisitorContext,
+    path: SveltePath<Element>,
+  ): false | void;
+  visitSvelteDocument(
+    this: SvelteVisitorContext,
+    path: SveltePath<Element>,
+  ): false | void;
+  visitSvelteBody(
+    this: SvelteVisitorContext,
+    path: SveltePath<Element>,
+  ): false | void;
   visitSvelteAttribute(
     this: SvelteVisitorContext,
     path: SveltePath<Attribute>,
@@ -65,7 +111,35 @@ export interface SvelteVisitorMethods {
     this: SvelteVisitorContext,
     path: SveltePath<SpreadAttribute>,
   ): false | void;
-  visitSvelteDirective(
+  visitSvelteAction(
+    this: SvelteVisitorContext,
+    path: SveltePath<Directive>,
+  ): false | void;
+  visitSvelteAnimation(
+    this: SvelteVisitorContext,
+    path: SveltePath<Directive>,
+  ): false | void;
+  visitSvelteBinding(
+    this: SvelteVisitorContext,
+    path: SveltePath<Directive>,
+  ): false | void;
+  visitSvelteClass(
+    this: SvelteVisitorContext,
+    path: SveltePath<Directive>,
+  ): false | void;
+  visitSvelteEventHandler(
+    this: SvelteVisitorContext,
+    path: SveltePath<Directive>,
+  ): false | void;
+  visitSvelteLet(
+    this: SvelteVisitorContext,
+    path: SveltePath<Directive>,
+  ): false | void;
+  visitSvelteRef(
+    this: SvelteVisitorContext,
+    path: SveltePath<Directive>,
+  ): false | void;
+  visitSvelteStyleDirective(
     this: SvelteVisitorContext,
     path: SveltePath<Directive>,
   ): false | void;
@@ -152,20 +226,17 @@ function traverseAllChildren(
   path: SveltePath<TemplateNode>,
   visitor: SvelteVisitor,
 ) {
-  switch (path.node.type) {
-    case 'Fragment':
-      traverseChildren(path.node.children, path, visitor);
-      break;
-    case 'Element':
-      traverseChildren(path.node.children, path, visitor);
-      traverseChildren(path.node.attributes, path, visitor);
-      break;
-    case 'MustacheTag':
-      visitRecast(path.node.expression, visitor);
-      break;
-    case 'Text':
-    default:
-      break;
+  if (path.node.children) {
+    traverseChildren(path.node.children, path, visitor);
+  }
+  if (path.node.attributes) {
+    traverseChildren(path.node.attributes, path, visitor);
+  }
+  if (path.node.expression) {
+    visitRecast(path.node.expression, visitor);
+  }
+  if (path.node.identifiers) {
+    visitRecast(path.node.identifiers, visitor);
   }
 }
 

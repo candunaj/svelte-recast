@@ -160,6 +160,9 @@ function traverseAllChildren(
       traverseChildren(path.node.children, path, visitor);
       traverseChildren(path.node.attributes, path, visitor);
       break;
+    case 'MustacheTag':
+      visitRecast(path.node.expression, visitor);
+      break;
     case 'Text':
     default:
       break;

@@ -22,7 +22,8 @@ import { visit as visitRecast } from 'recast';
 import { type ASTNode, type Visitor, type NodePath } from 'ast-types';
 // type ANode = TemplateNode | undefined;
 
-export interface SveltePath<T extends TemplateNode> {
+export type SvelteNode = TemplateNode | IfBlock | ElseBlock;
+export interface SveltePath<T extends SvelteNode> {
   node: T;
   parent: SveltePath<T> | null;
   parentPath: SveltePath<T> | null;
@@ -31,8 +32,19 @@ export interface SveltePath<T extends TemplateNode> {
 }
 
 type SvelteVisitorContext = {
-  traverse(path: SveltePath<TemplateNode>): void;
+  traverse(path: SveltePath<SvelteNode>): void;
 };
+
+export interface IfBlock {
+  type: 'IfBlock';
+  expression: ASTNode;
+  children: SvelteNode[];
+  else?: ElseBlock;
+}
+export interface ElseBlock {
+  type: 'ElseBlock';
+  children: SvelteNode[];
+}
 
 export interface SvelteVisitorMethods {
   visitSvelteSpread(
@@ -151,6 +163,14 @@ export interface SvelteVisitorMethods {
     this: SvelteVisitorContext,
     path: SveltePath<Comment>,
   ): false | void;
+  visitSvelteIfBlock(
+    this: SvelteVisitorContext,
+    path: SveltePath<IfBlock>,
+  ): false | void;
+  visitSvelteElseBlock(
+    this: SvelteVisitorContext,
+    path: SveltePath<ElseBlock>,
+  ): false | void;
 }
 
 export interface SvelteVisitor extends Visitor, Partial<SvelteVisitorMethods> {}
@@ -176,19 +196,17 @@ export function visit(code: Ast, visitor: SvelteVisitor) {
           throw new Error('prune is not supported');
         },
       },
-      null,
       visitor,
     );
   }
 }
 
-function visitSvelteTemplateNode<T extends TemplateNode>(
+function visitSvelteTemplateNode<T extends SvelteNode>(
   path: SveltePath<T>,
-  parent: SveltePath<T> | null,
   visitor: SvelteVisitor,
 ) {
   const context: SvelteVisitorContext = {
-    traverse(path: SveltePath<TemplateNode>) {},
+    traverse(path: SveltePath<SvelteNode>) {},
   };
   const method = getVisitorMethod(path.node, visitor);
   if (method) {
@@ -196,7 +214,7 @@ function visitSvelteTemplateNode<T extends TemplateNode>(
     const handledTraverseReturn =
       method.apply(
         {
-          traverse: (path: SveltePath<TemplateNode>) => {
+          traverse: (path: SveltePath<SvelteNode>) => {
             handledTraverse = true;
             traverseAllChildren(path, visitor);
           },
@@ -217,51 +235,80 @@ function visitSvelteTemplateNode<T extends TemplateNode>(
   }
 }
 
-function getVisitorMethod(node: TemplateNode, visitor: SvelteVisitor) {
+function getVisitorMethod(node: SvelteNode, visitor: SvelteVisitor) {
   // @ts-ignore
   return visitor[`visitSvelte${node.type}`];
 }
 
 function traverseAllChildren(
-  path: SveltePath<TemplateNode>,
+  path: SveltePath<SvelteNode>,
   visitor: SvelteVisitor,
 ) {
   if (path.node.children) {
     path.node.children = traverseChildren(path.node.children, path, visitor);
   }
+  if ((path.node as IfBlock).else) {
+    // @ts-ignore
+    path.node.else = visitSvelteTemplateNode(
+      {
+        // @ts-ignore
+        node: (path.node as IfBlock).else,
+        parent: path,
+        parentPath: path,
+        replace: (node: ElseBlock) => {
+          (path.node as IfBlock).else = node;
+        },
+        prune: () => {
+          (path.node as IfBlock).else = undefined;
+        },
+      },
+      visitor,
+    );
+  }
+
+  // @ts-ignore
   if (path.node.attributes) {
+    // @ts-ignore
     path.node.attributes = traverseChildren(
+      // @ts-ignore
       path.node.attributes,
       path,
       visitor,
     );
   }
+  // @ts-ignore
   if (path.node.expression) {
+    // @ts-ignore
     visitRecast(path.node.expression, visitor);
   }
+  // @ts-ignore
   if (path.node.identifiers) {
+    // @ts-ignore
     path.node.identifiers = traverseChildren(
+      // @ts-ignore
       path.node.identifiers,
       path,
       visitor,
     );
   }
 
+  // @ts-ignore
   if (path.node.value && Array.isArray(path.node.value)) {
+    // @ts-ignore
     path.node.value = traverseChildren(path.node.value, path, visitor);
   }
 }
 
 function traverseChildren(
-  children: TemplateNode[] | undefined,
-  parent: SveltePath<TemplateNode>,
+  children: SvelteNode[] | undefined,
+  parent: SveltePath<SvelteNode>,
   visitor: SvelteVisitor,
-): TemplateNode[] | undefined {
+): SvelteNode[] | undefined {
   if (!children) {
     return;
   }
 
-  const nodesToRemove: TemplateNode[] = [];
+  const nodesToRemove: SvelteNode[] = [];
 
   children.forEach((child, i) => {
     visitSvelteTemplateNode(
@@ -269,14 +316,13 @@ function traverseChildren(
         node: child,
         parent: parent,
         parentPath: parent,
-        replace: (node: TemplateNode) => {
+        replace: (node: SvelteNode) => {
           children[i] = node;
         },
         prune: () => {
           nodesToRemove.push(child);
         },
       },
-      parent,
       visitor,
     );
   });

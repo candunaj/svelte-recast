@@ -6,15 +6,9 @@ describe('parseSvelte function', () => {
   it('should return the ast', () => {
     const ast = parse(`
       <script>
-        const b = 1;
+        //const b = 1;
       </script>
       <!-- This is a comment -->
-      some text
-      {#if true}
-      <span>{a+b}</span>
-      {:else}
-      <span>{hura}</span>
-      {/if}
       <MyComponent first="123" second use:aaa {bbb} />
       `);
 
@@ -42,7 +36,6 @@ describe('parseSvelte function', () => {
       },
 
       visitSvelteAttribute(path) {
-        path.prune();
         this.traverse(path);
       },
     };

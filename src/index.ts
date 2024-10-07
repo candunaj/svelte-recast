@@ -248,8 +248,7 @@ function traverseAllChildren(
     path.node.children = traverseChildren(path.node.children, path, visitor);
   }
   if ((path.node as IfBlock).else) {
-    // @ts-ignore
-    path.node.else = visitSvelteTemplateNode(
+    visitSvelteTemplateNode(
       {
         // @ts-ignore
         node: (path.node as IfBlock).else,
@@ -278,8 +277,47 @@ function traverseAllChildren(
   }
   // @ts-ignore
   if (path.node.expression) {
+    const handler = {
+      get(target: SvelteVisitor, propKey: string) {
+        // @ts-ignore
+        const originalMethod = target[propKey];
+
+        // Check if the property is a function (method)
+        if (typeof originalMethod === 'function') {
+          return function (...args: any[]) {
+            // Add your custom argument or modify args here
+            // @ts-ignore
+            const parentHandler = {
+              get(target: SvelteVisitor, propKey: string) {
+                if (
+                  // @ts-ignore
+                  (propKey === 'parent' && !target.parent) ||
+                  // @ts-ignore
+                  (propKey === 'parentPath' && !target.parentPath)
+                ) {
+                  return path;
+                }
+                // @ts-ignore
+                return target[propKey];
+              },
+            };
+            // @ts-ignore
+            return originalMethod.apply(this, [
+              new Proxy(args[0], parentHandler),
+            ]);
+          };
+        }
+
+        // If it's not a function, just return the property
+        return originalMethod;
+      },
+    };
+
+    // Create a Proxy for the object
+    const proxyVisitor = new Proxy(visitor, handler);
+    // inject parent and parentPath to visitor. It will be svelte parentPath
     // @ts-ignore
-    visitRecast(path.node.expression, visitor);
+    visitRecast(path.node.expression, proxyVisitor);
   }
   // @ts-ignore
   if (path.node.identifiers) {
